@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -19,6 +20,11 @@ import (
 	"github.com/go-kit/log/level"
 	"github.com/jkroepke/azure-monitor-exporter/pkg/cache"
 	"github.com/prometheus/client_golang/prometheus"
+)
+
+var (
+	metricNameNotAllowedChars = regexp.MustCompile(`[^a-zA-Z0-9_:]`)
+	metricNameReplacer        = strings.NewReplacer("-", "_", " ", "_", "/", "_", ".", "_")
 )
 
 func New(
@@ -352,16 +358,20 @@ func (p *Probe) fetchMetrics(ctx context.Context, resources *Resources, ch chan<
 									continue
 								}
 
+								metricName := fmt.Sprintf("%s_%s_%s",
+									strings.ToLower(*metricValue.Name.Value),
+									metricType,
+									strings.ToLower(string(*metricValue.Unit)),
+								)
+								metricName = metricNameReplacer.Replace(metricName)
+								metricName = metricNameNotAllowedChars.ReplaceAllString(metricName, "")
+
 								ch <- prometheus.MustNewConstMetric(
 									prometheus.NewDesc(
 										prometheus.BuildFQName(
 											"azure_monitor",
-											strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(*metric.Namespace), ".", "_"), "/", "_"),
-											fmt.Sprintf("%s_%s_%s",
-												strings.ReplaceAll(strings.ToLower(*metricValue.Name.Value), " ", ""),
-												metricType,
-												strings.ToLower(string(*metricValue.Unit)),
-											),
+											metricNameReplacer.Replace(strings.ToLower(*metric.Namespace)),
+											metricName,
 										),
 										fmt.Sprintf("%s: %s", *metricValue.Name.LocalizedValue, *metricValue.DisplayDescription),
 										nil,

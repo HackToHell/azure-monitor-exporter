@@ -25,6 +25,7 @@ import (
 var (
 	metricNameNotAllowedChars = regexp.MustCompile(`[^a-zA-Z0-9_:]`)
 	metricNameReplacer        = strings.NewReplacer("-", "_", " ", "_", "/", "_", ".", "_")
+	resourcePattern           = regexp.MustCompile(`^/subscriptions/([^/]+)/resourceGroups/[^/]+/providers/[^/]+/[^/]+/([^/]+)$`)
 )
 
 func New(
@@ -327,6 +328,14 @@ func (p *Probe) fetchMetrics(ctx context.Context, resources *Resources, ch chan<
 								"subscription_id": subscriptionID,
 								"region":          *metric.ResourceRegion,
 								"instance":        *metric.ResourceID,
+							}
+							matches := resourcePattern.FindStringSubmatch(*metric.ResourceID)
+
+							if matches == nil || len(matches) < 3 {
+								_ = level.Warn(p.logger).Log("msg", "Failed to match resource ID", "resource_id", *metric.ResourceID)
+							} else {
+								prometheusLabels["subscriptionName"] = matches[1]
+								prometheusLabels["resourceName"] = matches[2]
 							}
 
 							for _, label := range metricTimeSeries.MetadataValues {

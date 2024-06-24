@@ -334,7 +334,6 @@ func (p *Probe) fetchMetrics(ctx context.Context, resources *Resources, ch chan<
 							if matches == nil || len(matches) < 3 {
 								_ = level.Warn(p.logger).Log("msg", "Failed to match resource ID", "resource_id", *metric.ResourceID)
 							} else {
-								prometheusLabels["subscriptionName"] = matches[1]
 								prometheusLabels["resourceName"] = matches[2]
 							}
 
